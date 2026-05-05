@@ -43,7 +43,7 @@ Input: tensor `(N, K, 6)`, `num_classes` (default 80).
 
 Input: tensor `(1, 4 + nc, N)` or `(1, N, 4 + nc)`.
 
-1. Detect orientation by comparing dim sizes: the smaller of the trailing two dims (after the leading 1) is the channel axis if it equals `4 + num_classes`, else error. If both arrangements would match, prefer `(1, 4+nc, N)` (canonical v8).
+1. Detect orientation. In YOLO outputs the anchor count N is always greater than the channel count `4+num_classes` (e.g. 8400 anchors with 84 channels). Therefore: identify the channel axis as the trailing dim with the *smaller* size, provided that size is at least 5 (i.e. `4 + num_classes ≥ 5`). The other trailing dim is the anchor axis. If both trailing dims are equal, or if the smaller dim is < 5, raise an error. Canonical layout `(1, 4+nc, N)` is preferred when emitting; if input is already canonical no transpose occurs.
 2. Transpose to canonical `(1, 4+nc, N)`.
 3. `boxes_cxcywh = output[0, 0:4, :]`. Convert to `xyxy`.
 4. `cls = output[0, 4:, :]`. `scores = cls.max(axis=0)`. `classes = cls.argmax(axis=0)`.
@@ -53,7 +53,7 @@ Input: tensor `(1, 4 + nc, N)` or `(1, N, 4 + nc)`.
 
 Input: tensor `(1, 4+nc, N)` or `(1, N, 4+nc)`. Param `assume_sigmoid: bool` (default True).
 
-1. Detect orientation as in Algorithm C step 1.
+1. Detect orientation: identify the channel axis as the trailing dim with the smaller size (must be ≥ 5); the other trailing dim is the anchor axis. Error if the trailing dims are equal or the smaller dim is < 5. Canonical layout is `(1, 4+nc, N)`.
 2. Transpose to canonical `(1, 4+nc, N)`.
 3. `boxes_cxcywh = output[0, 0:4, :]`. Convert to `xyxy`.
 4. `cls = output[0, 4:, :]`. If `not assume_sigmoid`: `cls = sigmoid(cls)`.
@@ -86,5 +86,5 @@ For each fixture in `fixtures/v1/<name>/`:
 
 ## Round-trip invariants
 
-- `e2e_to_v8_shape ∘ decode_detect_on_v8_shape` returns detection set equivalent to original `filter_e2e` (modulo ordering — both sort by score descending).
-- `v8_shape_to_e2e ∘ filter_e2e_on_v8_synth` is detection-equivalent.
+- Composition `e2e_to_v8_shape` followed by `decode_detect` (Algorithm B then D) returns a detection set equivalent to applying `filter_e2e` (Algorithm A) directly to the original input, modulo ordering — both produce the same elements when sorted by score descending.
+- Composition `filter_e2e` (Algorithm A) on a synthetic e2e input followed by `e2e_to_v8_shape` then `v8_shape_to_e2e` (Algorithms B then C) returns a detection set equivalent to the input.
