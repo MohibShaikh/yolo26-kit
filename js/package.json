@@ -1,6 +1,6 @@
 {
-  "name": "@yolo26/kit",
-  "version": "0.1.0",
+  "name": "yolo26-kit",
+  "version": "0.1.2",
   "description": "YOLO26 ↔ YOLOv8-pipeline bridge — shape adapters, decoder, letterbox, ORT wrapper.",
   "type": "module",
   "main": "./dist/index.cjs",
