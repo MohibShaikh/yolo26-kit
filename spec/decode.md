@@ -33,17 +33,17 @@ Input: tensor `(N, K, 6)`, `num_classes` (default 80).
 2. Allocate output `(1, 4 + num_classes, K_eff)` filled with zeros, dtype = input dtype.
 3. For each row `i ∈ [0, K_eff)`:
    - Read `x1, y1, x2, y2, conf, cid = input[i]`.
-   - If `conf == 0`: skip (leave zero pad).
-   - Compute `cx = (x1+x2)/2`, `cy = (y1+y2)/2`, `w = x2-x1`, `h = y2-y1`.
+   - For padded rows (where `conf == 0`), do not write box channels — leave them as the zero initialization.
+   - For non-padded rows, compute `cx = (x1+x2)/2`, `cy = (y1+y2)/2`, `w = x2-x1`, `h = y2-y1`.
    - Write `output[0, 0, i] = cx`, `output[0, 1, i] = cy`, `output[0, 2, i] = w`, `output[0, 3, i] = h`.
    - Write `output[0, 4 + int(cid), i] = conf`.
 4. Return.
 
 ## Algorithm C — `v8_shape_to_e2e`
 
-Input: tensor `(1, 4 + nc, N)` or `(1, N, 4 + nc)`.
+Input: tensor `(1, 4 + nc, N)` or `(1, N, 4 + nc)`. Optional param `num_classes` pins the split.
 
-1. Detect orientation. In YOLO outputs the anchor count N is always greater than the channel count `4+num_classes` (e.g. 8400 anchors with 84 channels). Therefore: identify the channel axis as the trailing dim with the *smaller* size, provided that size is at least 5 (i.e. `4 + num_classes ≥ 5`). The other trailing dim is the anchor axis. If both trailing dims are equal, or if the smaller dim is < 5, raise an error. Canonical layout `(1, 4+nc, N)` is preferred when emitting; if input is already canonical no transpose occurs.
+1. Channel axis: prefer explicit `num_classes` parameter when provided — pick the trailing dim that equals `num_classes + 4` (default 80+4=84). Error if neither trailing dim matches and no `num_classes` was provided. Error if both trailing dims are equal (ambiguous). When `num_classes` is not provided, fall back to the heuristic: pick the trailing dim with the *smaller* size, provided that size is at least 5 (i.e. `4 + num_classes ≥ 5`). The other trailing dim is the anchor axis. If both trailing dims are equal, or if the smaller dim is < 5, raise an error. Canonical layout `(1, 4+nc, N)` is preferred when emitting; if input is already canonical no transpose occurs.
 2. Transpose to canonical `(1, 4+nc, N)`.
 3. `boxes_cxcywh = output[0, 0:4, :]`. Convert to `xyxy`.
 4. `cls = output[0, 4:, :]`. `scores = cls.max(axis=0)`. `classes = cls.argmax(axis=0)`.
@@ -51,15 +51,18 @@ Input: tensor `(1, 4 + nc, N)` or `(1, N, 4 + nc)`.
 
 ## Algorithm D — `decode_detect` (non-e2e raw)
 
-Input: tensor `(1, 4+nc, N)` or `(1, N, 4+nc)`. Param `assume_sigmoid: bool` (default True).
+Input: tensor `(1, 4+nc, N)` or `(1, N, 4+nc)`. Params: `assume_sigmoid: bool` (default True), optional `num_classes: int`, optional `classes: Iterable[int]` allowlist, optional `min_area: float`.
 
-1. Detect orientation: identify the channel axis as the trailing dim with the smaller size (must be ≥ 5); the other trailing dim is the anchor axis. Error if the trailing dims are equal or the smaller dim is < 5. Canonical layout is `(1, 4+nc, N)`.
+1. Channel axis: prefer explicit `num_classes` parameter when provided — pick the trailing dim that equals `num_classes + 4` (default 80+4=84). Error if neither trailing dim matches and no `num_classes` was provided. Error if both trailing dims are equal (ambiguous). When `num_classes` is not provided, fall back to the heuristic: identify the channel axis as the trailing dim with the smaller size (must be ≥ 5); the other trailing dim is the anchor axis. Error if the trailing dims are equal or the smaller dim is < 5. Canonical layout is `(1, 4+nc, N)`.
 2. Transpose to canonical `(1, 4+nc, N)`.
 3. `boxes_cxcywh = output[0, 0:4, :]`. Convert to `xyxy`.
 4. `cls = output[0, 4:, :]`. If `not assume_sigmoid`: `cls = sigmoid(cls)`.
 5. `scores = cls.max(axis=0)`, `classes = cls.argmax(axis=0)`.
-6. Mask `scores >= conf_threshold`.
-7. Apply, sort, return per `format` (same as Algorithm A step 8).
+6. Mask = `finite & (scores >= conf_threshold)`.
+7. If any row has a `class_id` outside `[0, len(COCO_CLASSES))`: under `strict`, error; otherwise drop those rows from the mask. (Pre-mask before sort.)
+8. If `classes` allowlist provided: mask &= `class_id ∈ classes`.
+9. If `min_area` provided: mask &= `(x2-x1) * (y2-y1) >= min_area`.
+10. Apply, sort, return per `format` (same as Algorithm A step 8).
 
 ## Algorithm E — `letterbox_unmap`
 

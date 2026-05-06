@@ -1,8 +1,5 @@
 """Shared types and constants for yolo26-kit."""
-from __future__ import annotations
-
 from typing import TypedDict
-
 
 # Functional TypedDict syntax allows `class` as a literal field name
 # (it is a Python keyword and cannot be used as a class attribute).

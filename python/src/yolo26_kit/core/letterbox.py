@@ -18,7 +18,7 @@ def letterbox_unmap(
     out[:, 1] = (arr[:, 1] - pad_y) / scale
     out[:, 2] = (arr[:, 2] - pad_x) / scale
     out[:, 3] = (arr[:, 3] - pad_y) / scale
-    W, H = orig_size
+    W, H = orig_size  # noqa: N806 (math convention)
     np.clip(out[:, 0], 0.0, W, out=out[:, 0])
     np.clip(out[:, 1], 0.0, H, out=out[:, 1])
     np.clip(out[:, 2], 0.0, W, out=out[:, 2])
