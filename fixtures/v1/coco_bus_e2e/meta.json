@@ -1,0 +1,19 @@
+{
+  "orig_size": [
+    810,
+    1080
+  ],
+  "lb_size": [
+    640,
+    640
+  ],
+  "scale": 0.5925925925925926,
+  "pad": [
+    80,
+    0
+  ],
+  "model_name": "yolo26n.pt",
+  "export_mode": "e2e",
+  "ultralytics_version": "8.4.46",
+  "api": "filter_e2e"
+}

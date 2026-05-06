@@ -1,0 +1,19 @@
+{
+  "orig_size": [
+    1280,
+    720
+  ],
+  "lb_size": [
+    640,
+    640
+  ],
+  "scale": 0.5,
+  "pad": [
+    0,
+    140
+  ],
+  "model_name": "yolo26n.pt",
+  "export_mode": "raw",
+  "ultralytics_version": "8.4.46",
+  "api": "decode_detect"
+}

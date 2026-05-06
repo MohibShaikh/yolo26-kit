@@ -24,3 +24,6 @@ js/dist/
 # Project
 .superpowers/
 fixtures/v1/*/raw_output.npy.lock
+.cache/
+yolo*.pt
+yolo*.onnx
