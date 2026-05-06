@@ -29,4 +29,6 @@ export interface DecodeRawOptions {
   numClasses?: number;
   classes?: number[];
   minArea?: number;
+  nms?: boolean;
+  iouThreshold?: number;
 }

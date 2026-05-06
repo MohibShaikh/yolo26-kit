@@ -11,6 +11,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from ._axes import _split_channel_anchor_axes
+from .nms import class_aware_nms
 from .types import COCO_CLASSES, Detection
 
 _FormatT = Literal["dict", "arrays"]
@@ -31,6 +32,8 @@ def decode_detect(
     assume_sigmoid: bool = True,
     strict: bool = False,
     strict_dtype: bool = False,
+    nms: bool = True,
+    iou_threshold: float = 0.45,
 ) -> list[Detection] | dict[str, NDArray[Any]]:
     if not 0.0 <= conf <= 1.0:
         raise ValueError(f"conf must be in [0, 1]; got {conf}")
@@ -85,6 +88,12 @@ def decode_detect(
     boxes = boxes[mask]
     scores = scores[mask]
     classes_arr = classes_arr[mask]
+
+    if nms and scores.shape[0] > 0:
+        keep = class_aware_nms(boxes, scores, classes_arr, iou_threshold=iou_threshold)
+        boxes = boxes[keep]
+        scores = scores[keep]
+        classes_arr = classes_arr[keep]
 
     src_idx = np.arange(scores.shape[0], dtype=np.int64)
     order = np.lexsort((src_idx, classes_arr, -scores))

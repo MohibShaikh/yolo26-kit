@@ -1,5 +1,21 @@
 # Changelog
 
+## [py 0.1.1 / npm 0.1.3] - 2026-05-06
+
+### Fixed
+- **Critical:** `Decoder.predict` and `decode_detect` / `decodeDetect` on non-e2e ONNX exports now apply class-aware NMS by default. Previously raw `(1, 4+nc, N)` outputs returned overlapping duplicate boxes (e.g. ~46 boxes on bus.jpg vs the ~5 ultralytics returns).
+- README: TS example now imports `filterE2E` from `yolo26-kit` (correct subpath) and `fromOrt` from `yolo26-kit/ort`.
+
+### Added
+- `class_aware_nms` (Py) / `classAwareNMS` (TS): pure-numpy / pure-TS class-aware NMS exported at the public surface.
+- `decode_detect` / `decodeDetect` accept `nms: bool = True` and `iou_threshold: float = 0.45` (camelCase `nms` / `iouThreshold` in TS).
+- `Decoder.predict` forwards a `nms=` toggle for callers who want raw, pre-NMS output (e.g. custom post-processing on the non-e2e path).
+- README: explicit `end2end=True` export instructions and a Limitations section calling out single-image, detect-only, and browser nearest-neighbor resize.
+
+### Changed
+- Raw fixtures (`fixtures/v1/coco_bus_raw`, `coco_zidane_raw`) regenerated with `nms=True` semantics — conformance now binds NMS-applied output.
+- TS: removed unused `VERSION` constant from `js/src/index.ts` (use `package.json` for runtime version detection).
+
 ## [0.1.0] - 2026-05-06
 
 Initial release.

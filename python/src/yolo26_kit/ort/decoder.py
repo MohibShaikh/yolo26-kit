@@ -51,6 +51,9 @@ class Decoder:
         conf: float = 0.25,
         classes: Iterable[int] | None = None,
         format: Literal["dict", "arrays"] = "dict",
+        *,
+        nms: bool = True,
+        iou_threshold: float = 0.45,
     ) -> Any:
         hwc = to_hwc_uint8(image)
         nchw, meta = letterbox_forward(hwc, target=640)
@@ -60,7 +63,14 @@ class Decoder:
         if self.is_e2e:
             dets = filter_e2e(out, conf=conf, classes=classes, format="arrays")
         else:
-            dets = decode_detect(out, conf=conf, classes=classes, format="arrays")
+            dets = decode_detect(
+                out,
+                conf=conf,
+                classes=classes,
+                format="arrays",
+                nms=nms,
+                iou_threshold=iou_threshold,
+            )
 
         assert isinstance(dets, dict)
         boxes = dets["boxes"]

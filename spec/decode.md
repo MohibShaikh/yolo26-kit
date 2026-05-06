@@ -72,6 +72,26 @@ Input: `boxes (N, 4) xyxy`, `orig_size = (W_orig, H_orig)`, `lb_size = (W_lb, H_
 2. Clip to `[0, W_orig]` for x, `[0, H_orig]` for y.
 3. Return.
 
+## Algorithm G — class-aware NMS
+
+Input: `boxes (N, 4) xyxy`, `scores (N,)`, `classes (N,)`, `iou_threshold: float = 0.45`.
+
+1. If `N == 0`, return an empty index array.
+2. Group indices by `class_id`.
+3. For each class group, sort indices by descending score and run greedy NMS:
+   - Take the highest-scoring index `i` and keep it.
+   - For every remaining index `j`, compute IoU between boxes `i` and `j`.
+   - Suppress (drop) `j` if `IoU > iou_threshold`.
+   - Repeat until no candidates remain.
+4. Concatenate kept indices across classes and re-sort by descending score (global) so the final order is score-descending across all classes.
+5. Return kept indices.
+
+`decode_detect` (Algorithm D) applies Algorithm G by default (`nms=True`, `iou_threshold=0.45`) immediately after the conf/classes/min_area/finite filters and before the final stable sort. Pass `nms=False` to receive raw, possibly duplicate boxes (e.g. for downstream custom post-processing). The e2e path (`filter_e2e`) does not run NMS — the model graph already deduped.
+
+The same default and toggle apply to `Decoder.predict` for the non-e2e routing branch.
+
+The raw fixtures (`fixtures/v1/*_raw/expected.json`) are generated with `nms=True` semantics; conformance binds to NMS-applied output.
+
 ## Algorithm F — `normalize_output`
 
 Input: any tensor.

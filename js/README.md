@@ -23,6 +23,19 @@ npm i yolo26-kit                 # core
 npm i yolo26-kit onnxruntime-web # + ORT wrapper (peer dep)
 ```
 
+## Export YOLO26 to ONNX
+
+The "happy path" is to export with `end2end=True` so the ONNX graph emits already-deduplicated `(N, 300, 6)` detections:
+
+```python
+from ultralytics import YOLO
+
+YOLO("yolo26n.pt").export(format="onnx", end2end=True)
+# produces yolo26n.onnx with output shape (1, 300, 6)
+```
+
+If you cannot use `end2end=True` (e.g., quantized TFLite or some NPU runtimes that don't support the e2e head), `yolo26-kit` auto-detects and runs class-aware NMS for you when decoding raw `(1, 4+nc, N)` outputs.
+
 ## Use
 
 ### Python — e2e default (most users)
@@ -57,13 +70,16 @@ dets = decoder.predict("bus.jpg", conf=0.25)
 ### TypeScript
 
 ```ts
-import { filterE2E, fromOrt } from "yolo26-kit/ort";
+import { filterE2E } from "yolo26-kit";
+import { fromOrt } from "yolo26-kit/ort";
 import * as ort from "onnxruntime-web";
 
 const session = await ort.InferenceSession.create("yolo26n.onnx");
 const decoder = fromOrt(session);
 const dets = await decoder.predict(canvas, { conf: 0.25 });
 ```
+
+> Single image at a time (batch=1). Loop in your code if you have multiple frames.
 
 ### TypeScript — non-e2e raw export
 
@@ -74,7 +90,24 @@ const out = normalizeOutput(rawTensor);
 const dets = decodeDetect(out, [1, 84, 8400], { conf: 0.25, numClasses: 80 });
 ```
 
-## What's in the box (v0.1.0)
+### Decoder auto-routing
+
+The `Decoder` auto-detects whether the ONNX is e2e (output shape ends in 6) or raw (output shape `(1, 4+nc, N)`):
+
+- **e2e:** runs `filter_e2e` — already deduped by the model, no NMS.
+- **raw:** runs `decode_detect` with class-aware NMS (default `iou_threshold=0.45`).
+
+Override the NMS default if you want raw outputs (e.g., for further post-processing):
+
+```python
+decoder.predict("bus.jpg", conf=0.25, nms=False)
+```
+
+```ts
+await decoder.predict(canvas, { conf: 0.25, nms: false });
+```
+
+## What's in the box (v0.1.x)
 
 | Function | Purpose |
 |---|---|
@@ -84,6 +117,7 @@ const dets = decodeDetect(out, [1, 84, 8400], { conf: 0.25, numClasses: 80 });
 | `v8_shape_to_e2e` / `v8ShapeToE2E` | Reverse adapter |
 | `letterbox_unmap` / `letterboxUnmap` | Undo letterbox padding back to original image coords |
 | `normalize_output` / `normalizeOutput` | Dtype workaround for upstream YOLO26 fp16 export issue (#23645) |
+| `class_aware_nms` / `classAwareNMS` | Class-aware non-maximum suppression for raw decoder output |
 | `Decoder.predict()` | Image in → detections in original-image coords out (auto e2e/non-e2e routing) |
 
 ## Compatibility
@@ -118,6 +152,12 @@ npm test
 npm run typecheck
 npm run lint
 ```
+
+## Limitations (v0.1.x)
+
+- **Single image only:** decoders reject `batch > 1`. Loop in user code for multi-image inference. Batched decode tracked for v0.2.
+- **Detect task only:** seg/pose/cls/OBB queued.
+- **Browser preprocess uses nearest-neighbor resize** for portability. For pixel-perfect parity with PIL bilinear, pre-resize via canvas.
 
 ## License
 

@@ -1,5 +1,6 @@
 import { splitChannelAnchorAxes } from "./_axes";
 import { COCO_CLASSES } from "./classes";
+import { classAwareNMS } from "./nms";
 import type { ArrayDetections, DecodeRawOptions, Detection } from "./types";
 
 const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
@@ -22,6 +23,8 @@ export function decodeDetect(
     numClasses,
     classes,
     minArea,
+    nms = true,
+    iouThreshold = 0.45,
   } = opts;
   if (conf < 0 || conf > 1) throw new Error(`conf must be in [0, 1]; got ${conf}`);
 
@@ -86,15 +89,26 @@ export function decodeDetect(
     idxs.push(i);
   }
 
-  const order = scoresArr
-    .map((_, i) => i)
-    .sort((p, q) => {
-      const sd = (scoresArr[q] as number) - (scoresArr[p] as number);
-      if (sd !== 0) return sd;
-      const cd = (clsArr[p] as number) - (clsArr[q] as number);
-      if (cd !== 0) return cd;
-      return (idxs[p] as number) - (idxs[q] as number);
-    });
+  let keepIndices: number[] | null = null;
+  if (nms && scoresArr.length > 0) {
+    const M0 = scoresArr.length;
+    const flatBoxes = new Float32Array(M0 * 4);
+    for (let k = 0; k < M0 * 4; k++) flatBoxes[k] = boxesArr[k] as number;
+    const flatScores = new Float32Array(scoresArr);
+    const flatClasses = new Int32Array(clsArr);
+    const kept = classAwareNMS(flatBoxes, flatScores, flatClasses, iouThreshold);
+    keepIndices = Array.from(kept);
+  }
+
+  const candidateIdxs = keepIndices !== null ? keepIndices : scoresArr.map((_, i) => i);
+
+  const order = candidateIdxs.slice().sort((p, q) => {
+    const sd = (scoresArr[q] as number) - (scoresArr[p] as number);
+    if (sd !== 0) return sd;
+    const cd = (clsArr[p] as number) - (clsArr[q] as number);
+    if (cd !== 0) return cd;
+    return (idxs[p] as number) - (idxs[q] as number);
+  });
 
   const M = order.length;
   const outBoxes = new Float32Array(M * 4);

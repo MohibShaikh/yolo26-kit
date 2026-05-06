@@ -4,17 +4,19 @@ from typing import Any
 from .core.decode_raw import decode_detect
 from .core.filter_e2e import filter_e2e
 from .core.letterbox import letterbox_unmap
+from .core.nms import class_aware_nms
 from .core.normalize import normalize_output
 from .core.shapes import e2e_to_v8_shape, v8_shape_to_e2e
 from .core.types import COCO_CLASSES, Detection
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "COCO_CLASSES",
     "Decoder",
     "Detection",
     "__version__",
+    "class_aware_nms",
     "decode_detect",
     "e2e_to_v8_shape",
     "filter_e2e",

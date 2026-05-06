@@ -19,6 +19,8 @@ export interface PredictOptions {
   conf?: number;
   classes?: number[];
   format?: "dict" | "arrays";
+  nms?: boolean;
+  iouThreshold?: number;
 }
 
 export type PredictInput = HTMLCanvasElement | ImageBitmap | ImageData;
@@ -48,7 +50,7 @@ export class Decoder {
     input: PredictInput,
     opts: PredictOptions = {},
   ): Promise<Detection[] | ArrayDetections> {
-    const { conf = 0.25, classes, format = "dict" } = opts;
+    const { conf = 0.25, classes, format = "dict", nms = true, iouThreshold = 0.45 } = opts;
     let imageData: ImageData;
     if (typeof ImageBitmap !== "undefined" && input instanceof ImageBitmap) {
       imageData = await imageBitmapToImageData(input);
@@ -70,7 +72,13 @@ export class Decoder {
     if (this.isE2E) {
       arr = filterE2E(out, raw.dims, { conf, classes, format: "arrays" }) as ArrayDetections;
     } else {
-      arr = decodeDetect(out, raw.dims, { conf, format: "arrays" }) as ArrayDetections;
+      arr = decodeDetect(out, raw.dims, {
+        conf,
+        classes,
+        format: "arrays",
+        nms,
+        iouThreshold,
+      }) as ArrayDetections;
     }
 
     if (arr.boxes.length) {
