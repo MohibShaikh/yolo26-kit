@@ -4,11 +4,17 @@ from __future__ import annotations
 from typing import TypedDict
 
 
-class Detection(TypedDict):
-    box: list[float]   # [x1, y1, x2, y2]
-    score: float
-    class_: int        # written as `class` in JSON; mapped at IO boundary
-    label: str
+# Functional TypedDict syntax allows `class` as a literal field name
+# (it is a Python keyword and cannot be used as a class attribute).
+Detection = TypedDict(
+    "Detection",
+    {
+        "box": list[float],   # [x1, y1, x2, y2]
+        "score": float,
+        "class": int,
+        "label": str,
+    },
+)
 
 
 # COCO 80 classes, exactly as ultralytics ships them.
