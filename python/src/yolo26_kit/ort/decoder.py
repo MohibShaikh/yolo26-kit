@@ -17,7 +17,7 @@ from .preprocess import letterbox_forward
 def from_ort(session_or_path: Any, *, providers: list[str] | None = None) -> Decoder:
     if isinstance(session_or_path, (str, Path)):
         try:
-            import onnxruntime as ort  # type: ignore[import-not-found]
+            import onnxruntime as ort  # type: ignore[import-untyped]
         except ImportError as e:
             raise ImportError("install yolo26-kit[ort] to use Decoder") from e
         session = ort.InferenceSession(
