@@ -1,3 +1,5 @@
+import { splitChannelAnchorAxes } from "./_axes";
+
 export interface ShapedTensor {
   data: Float32Array;
   shape: number[];
@@ -6,58 +8,6 @@ export interface ShapedTensor {
 function readF32(arr: Float32Array, i: number): number {
   // biome-ignore lint/style/noNonNullAssertion: index bounds guaranteed by caller
   return arr[i]!;
-}
-
-interface AxesSplit {
-  channelStride: number; // stride in the flat array to advance one channel
-  anchorStride: number; // stride to advance one anchor
-  channels: number;
-  anchors: number;
-}
-
-function splitChannelAnchorAxes(
-  shape: readonly number[],
-  numClasses?: number,
-): { canonicalAxes: AxesSplit } {
-  if (shape.length !== 3 || shape[0] !== 1) {
-    throw new Error(`expected (1, ?, ?); got ${JSON.stringify(shape)}`);
-  }
-  const a = shape[1] as number;
-  const b = shape[2] as number;
-  const expected = numClasses === undefined ? undefined : 4 + numClasses;
-
-  // If numClasses provided, prefer the dim that exactly equals 4+numClasses.
-  if (expected !== undefined) {
-    if (a === expected && b === expected) {
-      throw new Error(`ambiguous: both trailing dims equal ${expected}`);
-    }
-    if (a === expected) return { canonicalAxes: channelsFirst(a, b) };
-    if (b === expected) return { canonicalAxes: anchorsFirst(a, b) };
-    throw new Error(
-      `neither trailing dim equals num_classes+4=${expected}; shape=${JSON.stringify(shape)}`,
-    );
-  }
-
-  // Heuristic: smaller trailing dim is channels, must be >=5.
-  if (a === b) throw new Error("ambiguous channel/anchor: trailing dims equal");
-  const aOk = a >= 5;
-  const bOk = b >= 5;
-  if (aOk && bOk) {
-    return a < b ? { canonicalAxes: channelsFirst(a, b) } : { canonicalAxes: anchorsFirst(a, b) };
-  }
-  if (aOk) return { canonicalAxes: channelsFirst(a, b) };
-  if (bOk) return { canonicalAxes: anchorsFirst(a, b) };
-  throw new Error(`class axis must be ≥5; got shape ${JSON.stringify(shape)}`);
-}
-
-function channelsFirst(channels: number, anchors: number): AxesSplit {
-  // shape (1, channels, anchors): stride for channel = anchors, anchor = 1
-  return { channelStride: anchors, anchorStride: 1, channels, anchors };
-}
-
-function anchorsFirst(anchors: number, channels: number): AxesSplit {
-  // shape (1, anchors, channels): stride for channel = 1, anchor = channels
-  return { channelStride: 1, anchorStride: channels, channels, anchors };
 }
 
 export function e2eToV8Shape(
