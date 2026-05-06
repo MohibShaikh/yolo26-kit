@@ -6,9 +6,10 @@ import os
 from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 
 
-def _from_bytes(b: bytes) -> np.ndarray:
+def _from_bytes(b: bytes) -> NDArray[np.uint8]:
     try:
         from PIL import Image
     except ImportError as e:
@@ -17,7 +18,7 @@ def _from_bytes(b: bytes) -> np.ndarray:
     return np.asarray(img, dtype=np.uint8)
 
 
-def to_hwc_uint8(image: Any) -> np.ndarray:
+def to_hwc_uint8(image: Any) -> NDArray[np.uint8]:
     """Coerce input to HWC uint8 ndarray. Accepts: file path, bytes, PIL.Image, ndarray."""
     if isinstance(image, np.ndarray):
         if image.dtype == np.uint8 and image.ndim == 3 and image.shape[-1] in (1, 3, 4):

@@ -5,13 +5,16 @@ See spec/decode.md Algorithms C and D.
 """
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
+from numpy.typing import NDArray
 
 
 def _split_channel_anchor_axes(
-    arr: np.ndarray,
+    arr: NDArray[Any],
     num_classes: int | None = None,
-) -> tuple[np.ndarray, int]:
+) -> tuple[NDArray[Any], int]:
     """Return ``(canonical, channel_count)`` where canonical has shape ``(1, 4+nc, N)``.
 
     Selection rule:

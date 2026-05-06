@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
+from numpy.typing import NDArray
 
 from .types import COCO_CLASSES, Detection
 
@@ -12,14 +13,14 @@ _FormatT = Literal["dict", "arrays"]
 
 
 def filter_e2e(
-    output: np.ndarray,
+    output: NDArray[Any],
     conf: float = 0.25,
     classes: Iterable[int] | None = None,
     min_area: float | None = None,
     format: _FormatT = "dict",
     *,
     strict: bool = False,
-) -> list[Detection] | dict[str, np.ndarray]:
+) -> list[Detection] | dict[str, NDArray[Any]]:
     """Filter and format the (N, K, 6) e2e YOLO26 output.
 
     See spec/decode.md Algorithm A.

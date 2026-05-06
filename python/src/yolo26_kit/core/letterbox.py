@@ -1,16 +1,19 @@
 """Letterbox coordinate utilities. See spec/decode.md Algorithm E."""
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
+from numpy.typing import NDArray
 
 
 def letterbox_unmap(
-    boxes: np.ndarray,
+    boxes: NDArray[Any],
     orig_size: tuple[int, int],   # (W_orig, H_orig)
     lb_size: tuple[int, int],     # (W_lb, H_lb)
     scale: float,
     pad: tuple[float, float],     # (pad_x, pad_y)
-) -> np.ndarray:
+) -> NDArray[np.float32]:
     arr = np.asarray(boxes, dtype=np.float32).reshape(-1, 4)
     pad_x, pad_y = pad
     out = np.empty_like(arr)

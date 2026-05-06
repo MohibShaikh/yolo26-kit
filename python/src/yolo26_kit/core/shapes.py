@@ -4,14 +4,15 @@ See spec/decode.md Algorithm B and C.
 """
 from __future__ import annotations
 
-from typing import cast
+from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 
 from ._axes import _split_channel_anchor_axes
 
 
-def e2e_to_v8_shape(output: np.ndarray, *, num_classes: int = 80) -> np.ndarray:
+def e2e_to_v8_shape(output: NDArray[Any], *, num_classes: int = 80) -> NDArray[Any]:
     arr = np.asarray(output)
     if arr.ndim == 2:
         arr = arr[None, ...]
@@ -44,14 +45,14 @@ def e2e_to_v8_shape(output: np.ndarray, *, num_classes: int = 80) -> np.ndarray:
     out[0, 2, valid_idx] = w[valid_idx]
     out[0, 3, valid_idx] = h[valid_idx]
     out[0, 4 + valid_cids, valid_idx] = confs[valid_idx]
-    return cast(np.ndarray, out)
+    return out
 
 
 def v8_shape_to_e2e(
-    output: np.ndarray,
+    output: NDArray[Any],
     *,
     num_classes: int | None = None,
-) -> np.ndarray:
+) -> NDArray[Any]:
     arr = np.asarray(output)
     canonical, _ch = _split_channel_anchor_axes(arr, num_classes=num_classes)
 

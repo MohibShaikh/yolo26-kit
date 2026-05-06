@@ -5,9 +5,10 @@ center pad with gray (114, 114, 114).
 """
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import numpy as np
+from numpy.typing import NDArray
 
 
 class LetterboxMeta(TypedDict):
@@ -17,7 +18,7 @@ class LetterboxMeta(TypedDict):
     lb_size: tuple[int, int]          # (W_lb, H_lb) — both = target
 
 
-def _resize_bilinear(img_hwc_u8: np.ndarray, new_w: int, new_h: int) -> np.ndarray:
+def _resize_bilinear(img_hwc_u8: NDArray[np.uint8], new_w: int, new_h: int) -> NDArray[np.uint8]:
     try:
         from PIL import Image
     except ImportError as e:
@@ -28,10 +29,10 @@ def _resize_bilinear(img_hwc_u8: np.ndarray, new_w: int, new_h: int) -> np.ndarr
 
 
 def letterbox_forward(
-    img_hwc_u8: np.ndarray,
+    img_hwc_u8: NDArray[Any],
     target: int = 640,
     pad_value: int = 114,
-) -> tuple[np.ndarray, LetterboxMeta]:
+) -> tuple[NDArray[np.float32], LetterboxMeta]:
     H, W = img_hwc_u8.shape[:2]  # noqa: N806
     scale = min(target / W, target / H)
     new_w, new_h = round(W * scale), round(H * scale)

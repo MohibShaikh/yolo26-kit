@@ -5,9 +5,10 @@ See spec/decode.md Algorithm D.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 import numpy as np
+from numpy.typing import NDArray
 
 from ._axes import _split_channel_anchor_axes
 from .types import COCO_CLASSES, Detection
@@ -15,12 +16,12 @@ from .types import COCO_CLASSES, Detection
 _FormatT = Literal["dict", "arrays"]
 
 
-def _sigmoid(x: np.ndarray) -> np.ndarray:
-    return cast(np.ndarray, 1.0 / (1.0 + np.exp(-x)))
+def _sigmoid(x: NDArray[Any]) -> NDArray[np.float32]:
+    return cast(NDArray[np.float32], 1.0 / (1.0 + np.exp(-x)))
 
 
 def decode_detect(
-    output: np.ndarray,
+    output: NDArray[Any],
     conf: float = 0.25,
     classes: Iterable[int] | None = None,
     min_area: float | None = None,
@@ -30,7 +31,7 @@ def decode_detect(
     assume_sigmoid: bool = True,
     strict: bool = False,
     strict_dtype: bool = False,
-) -> list[Detection] | dict[str, np.ndarray]:
+) -> list[Detection] | dict[str, NDArray[Any]]:
     if not 0.0 <= conf <= 1.0:
         raise ValueError(f"conf must be in [0, 1]; got {conf}")
     arr = np.asarray(output)

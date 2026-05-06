@@ -1,10 +1,13 @@
 """Output dtype normalizer. See spec/decode.md Algorithm F."""
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
+from numpy.typing import NDArray
 
 
-def normalize_output(output: np.ndarray) -> np.ndarray:
+def normalize_output(output: NDArray[Any]) -> NDArray[np.float32]:
     arr = np.asarray(output)
     if np.issubdtype(arr.dtype, np.integer):
         raise ValueError(
