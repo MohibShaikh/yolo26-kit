@@ -1,0 +1,47 @@
+{
+  "name": "@yolo26/kit",
+  "version": "0.1.0",
+  "description": "YOLO26 ↔ YOLOv8-pipeline bridge — shape adapters, decoder, letterbox, ORT wrapper.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./ort": {
+      "types": "./dist/ort/index.d.ts",
+      "import": "./dist/ort/index.js",
+      "require": "./dist/ort/index.cjs"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check src tests",
+    "format": "biome format --write src tests",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["yolo", "yolo26", "object-detection", "onnx", "computer-vision", "webgpu"],
+  "license": "Apache-2.0",
+  "peerDependencies": {
+    "onnxruntime-web": ">=1.20.0"
+  },
+  "peerDependenciesMeta": {
+    "onnxruntime-web": { "optional": true }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.8.0",
+    "@types/node": "^20.0.0",
+    "fast-check": "^3.20.0",
+    "onnxruntime-web": "^1.20.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
+  }
+}
