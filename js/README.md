@@ -122,9 +122,10 @@ await decoder.predict(canvas, { conf: 0.25, nms: false });
 
 ## Compatibility
 
-| `yolo26-kit` | `ultralytics` (verified) | `onnxruntime` |
-|---|---|---|
-| 0.1.0 | 8.4.x (yolo26n.pt) | 1.17+ |
+| package | version | `ultralytics` (verified) | runtime |
+|---|---|---|---|
+| `yolo26-kit` (PyPI) | 0.1.1 | 8.4.x (yolo26n.pt) | onnxruntime ≥1.17 |
+| `yolo26-kit` (npm)  | 0.1.3 | 8.4.x (yolo26n.pt) | onnxruntime-web ≥1.20 |
 
 A nightly live-diff workflow installs the latest `ultralytics` and re-validates fixtures. Drift opens an auto-tagged `drift` issue.
 
