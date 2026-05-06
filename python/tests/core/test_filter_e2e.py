@@ -99,3 +99,18 @@ def test_filter_strict_true_errors_on_nan():
     out = _make([(0, 0, 1, 1, np.nan, 0)])
     with pytest.raises(ValueError, match="NaN"):
         filter_e2e(out, conf=0.25, strict=True)
+
+
+def test_filter_drops_out_of_range_class_id():
+    # Without strict, a row with cls=200 (out of COCO range) is dropped, not crashed.
+    out = _make([(0, 0, 1, 1, 0.9, 200), (0, 0, 1, 1, 0.9, 5)])
+    dets = filter_e2e(out, conf=0.25, format="dict")
+    assert isinstance(dets, list)
+    assert len(dets) == 1
+    assert dets[0]["class"] == 5
+
+
+def test_filter_strict_true_errors_on_out_of_range_class_id():
+    out = _make([(0, 0, 1, 1, 0.9, 200)])
+    with pytest.raises(ValueError, match="class_id out of range"):
+        filter_e2e(out, conf=0.25, strict=True)

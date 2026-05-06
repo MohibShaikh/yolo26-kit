@@ -4,48 +4,37 @@ See spec/decode.md Algorithm D.
 """
 from __future__ import annotations
 
-from typing import Literal, Union
+from collections.abc import Iterable
+from typing import Literal, cast
 
 import numpy as np
 
+from ._axes import _split_channel_anchor_axes
 from .types import COCO_CLASSES, Detection
 
 _FormatT = Literal["dict", "arrays"]
 
 
 def _sigmoid(x: np.ndarray) -> np.ndarray:
-    return 1.0 / (1.0 + np.exp(-x))
+    return cast(np.ndarray, 1.0 / (1.0 + np.exp(-x)))
 
 
 def decode_detect(
     output: np.ndarray,
     conf: float = 0.25,
+    classes: Iterable[int] | None = None,
+    min_area: float | None = None,
     format: _FormatT = "dict",
     *,
+    num_classes: int | None = None,
     assume_sigmoid: bool = True,
     strict: bool = False,
     strict_dtype: bool = False,
-) -> Union[list[Detection], dict[str, np.ndarray]]:
+) -> list[Detection] | dict[str, np.ndarray]:
     if not 0.0 <= conf <= 1.0:
         raise ValueError(f"conf must be in [0, 1]; got {conf}")
     arr = np.asarray(output)
-    if arr.ndim != 3 or arr.shape[0] != 1:
-        raise ValueError(f"expected (1, 4+nc, N) or (1, N, 4+nc); got {arr.shape}")
-
-    a, b = arr.shape[1], arr.shape[2]
-    # Channel axis is the smaller dim (4+nc << N typically). Require it >= 5.
-    if a <= b:
-        canonical = arr
-        ch = a
-    else:
-        canonical = np.transpose(arr, (0, 2, 1))
-        ch = b
-    if ch < 5:
-        raise ValueError(
-            f"class axis must be ≥5 (4 + ≥1 classes); got {arr.shape}"
-        )
-
-    nc = canonical.shape[1] - 4
+    canonical, _ch = _split_channel_anchor_axes(arr, num_classes=num_classes)
 
     if arr.dtype != np.float32:
         if strict_dtype:
@@ -58,7 +47,7 @@ def decode_detect(
         cls = _sigmoid(cls)
 
     scores = cls.max(axis=0)
-    classes = cls.argmax(axis=0).astype(np.int32)
+    classes_arr = cls.argmax(axis=0).astype(np.int32)
 
     cx, cy, w, h = boxes_cxcywh[0], boxes_cxcywh[1], boxes_cxcywh[2], boxes_cxcywh[3]
     x1 = cx - w * 0.5
@@ -70,23 +59,43 @@ def decode_detect(
     finite = np.isfinite(scores) & np.isfinite(boxes).all(axis=1)
     if not finite.all() and strict:
         raise ValueError("output contains NaN/Inf")
-    valid_box = (w > 0) & (h > 0)
-    mask = finite & valid_box & (scores >= conf)
+    mask = finite & (scores >= conf)
+
+    # Class-id range validation (argmax may pick a class index whose
+    # underlying number of classes exceeds the COCO label table).
+    valid_cls = (classes_arr >= 0) & (classes_arr < len(COCO_CLASSES))
+    if not valid_cls.all():
+        if strict:
+            raise ValueError("class_id out of range")
+        mask &= valid_cls
+
+    if classes is not None:
+        allowlist = np.fromiter(classes, dtype=np.int32)
+        if allowlist.size:
+            if (allowlist < 0).any() or (allowlist >= len(COCO_CLASSES)).any():
+                raise ValueError(f"classes allowlist out of range: {allowlist.tolist()}")
+            mask &= np.isin(classes_arr, allowlist)
+
+    if min_area is not None:
+        widths = boxes[:, 2] - boxes[:, 0]
+        heights = boxes[:, 3] - boxes[:, 1]
+        mask &= (widths * heights) >= min_area
+
     boxes = boxes[mask]
     scores = scores[mask]
-    classes = classes[mask]
+    classes_arr = classes_arr[mask]
 
     src_idx = np.arange(scores.shape[0], dtype=np.int64)
-    order = np.lexsort((src_idx, classes, -scores))
+    order = np.lexsort((src_idx, classes_arr, -scores))
     boxes = boxes[order]
     scores = scores[order]
-    classes = classes[order]
+    classes_arr = classes_arr[order]
 
     if format == "arrays":
         return {
             "boxes": np.ascontiguousarray(boxes, dtype=np.float32),
             "scores": np.ascontiguousarray(scores, dtype=np.float32),
-            "classes": np.ascontiguousarray(classes, dtype=np.int32),
+            "classes": np.ascontiguousarray(classes_arr, dtype=np.int32),
         }
     if format == "dict":
         return [
@@ -96,6 +105,6 @@ def decode_detect(
                 "class": int(c),
                 "label": COCO_CLASSES[int(c)],
             }
-            for b, s, c in zip(boxes, scores, classes)
+            for b, s, c in zip(boxes, scores, classes_arr, strict=True)
         ]
     raise ValueError(f"unknown format: {format!r}")

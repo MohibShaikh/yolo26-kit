@@ -1,7 +1,8 @@
 """Filter helper for YOLO26 end-to-end (default) ONNX export output."""
 from __future__ import annotations
 
-from typing import Iterable, Literal, Union
+from collections.abc import Iterable
+from typing import Literal
 
 import numpy as np
 
@@ -18,7 +19,7 @@ def filter_e2e(
     format: _FormatT = "dict",
     *,
     strict: bool = False,
-) -> Union[list[Detection], dict[str, np.ndarray]]:
+) -> list[Detection] | dict[str, np.ndarray]:
     """Filter and format the (N, K, 6) e2e YOLO26 output.
 
     See spec/decode.md Algorithm A.
@@ -57,6 +58,15 @@ def filter_e2e(
         finite_mask = np.ones(arr.shape[0], dtype=bool)
 
     mask = finite_mask & (scores >= conf)
+
+    # Class-id range validation: drop or error on out-of-range class ids,
+    # so downstream COCO_CLASSES lookup never goes out-of-bounds.
+    if classes_arr.size:
+        valid_cls = (classes_arr >= 0) & (classes_arr < len(COCO_CLASSES))
+        if not valid_cls.all():
+            if strict:
+                raise ValueError("class_id out of range")
+            mask &= valid_cls
 
     if classes is not None:
         allowlist = np.fromiter(classes, dtype=np.int32)

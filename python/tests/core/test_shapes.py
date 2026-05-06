@@ -40,11 +40,12 @@ def test_e2e_to_v8_shape_rejects_bad_last_dim():
 
 
 def test_v8_shape_to_e2e_round_trip():
-    # Create canonical v8 shape with known detection
+    # Create canonical v8 shape with known detection. n=1 is ambiguous via
+    # the heuristic (smaller dim < 5), so we pin num_classes=80.
     v8 = np.zeros((1, 84, 1), dtype=np.float32)
     v8[0, 0:4, 0] = (20, 30, 20, 20)  # cxcywh
     v8[0, 4 + 5, 0] = 0.9
-    e2e = v8_shape_to_e2e(v8)
+    e2e = v8_shape_to_e2e(v8, num_classes=80)
     assert e2e.shape == (1, 1, 6)
     np.testing.assert_array_equal(e2e[0, 0, 0:4], [10, 20, 30, 40])  # xyxy
     assert e2e[0, 0, 4] == pytest.approx(0.9)
@@ -56,6 +57,43 @@ def test_v8_shape_to_e2e_accepts_transposed_input():
     v8_transposed = np.zeros((1, 1, 84), dtype=np.float32)
     v8_transposed[0, 0, 0:4] = (20, 30, 20, 20)
     v8_transposed[0, 0, 4 + 5] = 0.9
-    e2e = v8_shape_to_e2e(v8_transposed)
+    e2e = v8_shape_to_e2e(v8_transposed, num_classes=80)
     assert e2e.shape == (1, 1, 6)
     assert int(e2e[0, 0, 5]) == 5
+
+
+def test_v8_shape_to_e2e_rejects_equal_trailing_dims():
+    # Both trailing dims equal 84 is ambiguous without num_classes.
+    v8 = np.zeros((1, 84, 84), dtype=np.float32)
+    with pytest.raises(ValueError, match="ambiguous"):
+        v8_shape_to_e2e(v8)
+
+
+def test_v8_shape_to_e2e_explicit_num_classes_small_anchors():
+    # K=10 anchors with 84 channels: heuristic picks the smaller dim (10)
+    # incorrectly. Explicit num_classes=80 disambiguates and rotates the
+    # tensor into canonical orientation.
+    v8 = np.zeros((1, 84, 10), dtype=np.float32)
+    v8[0, 0:4, 0] = (20, 30, 20, 20)
+    v8[0, 4 + 7, 0] = 0.7
+    e2e = v8_shape_to_e2e(v8, num_classes=80)
+    assert e2e.shape == (1, 10, 6)
+    np.testing.assert_array_equal(e2e[0, 0, 0:4], [10, 20, 30, 40])
+    assert int(e2e[0, 0, 5]) == 7
+
+
+def test_e2e_to_v8_then_decode_round_trip_small_k():
+    # Round-trip invariant: B then D produces same elements as A.
+    from yolo26_kit.core.decode_raw import decode_detect
+    from yolo26_kit.core.filter_e2e import filter_e2e
+
+    rows = np.asarray(
+        [[10, 20, 30, 40, 0.9, 5], [50, 60, 70, 80, 0.7, 3]], dtype=np.float32,
+    )
+    e2e = rows[None, ...]  # (1, 2, 6) — K=2
+    v8 = e2e_to_v8_shape(e2e, num_classes=80)
+    direct = filter_e2e(e2e, conf=0.25, format="arrays")
+    via_decode = decode_detect(v8, conf=0.25, num_classes=80, format="arrays")
+    np.testing.assert_allclose(direct["boxes"], via_decode["boxes"], atol=1e-5)
+    np.testing.assert_allclose(direct["scores"], via_decode["scores"], atol=1e-6)
+    np.testing.assert_array_equal(direct["classes"], via_decode["classes"])
