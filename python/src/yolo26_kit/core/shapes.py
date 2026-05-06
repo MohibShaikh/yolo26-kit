@@ -4,7 +4,11 @@ See spec/decode.md Algorithm B and C.
 """
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
+
+from ._axes import _split_channel_anchor_axes
 
 
 def e2e_to_v8_shape(output: np.ndarray, *, num_classes: int = 80) -> np.ndarray:
@@ -16,7 +20,7 @@ def e2e_to_v8_shape(output: np.ndarray, *, num_classes: int = 80) -> np.ndarray:
     if arr.shape[-1] != 6:
         raise ValueError(f"e2e last dim must be 6; got {arr.shape[-1]}")
 
-    K = arr.shape[1]
+    K = arr.shape[1]  # noqa: N806 (math convention)
     out = np.zeros((1, 4 + num_classes, K), dtype=arr.dtype)
     boxes = arr[0, :, 0:4]  # xyxy
     confs = arr[0, :, 4]
@@ -27,49 +31,29 @@ def e2e_to_v8_shape(output: np.ndarray, *, num_classes: int = 80) -> np.ndarray:
     w = boxes[:, 2] - boxes[:, 0]
     h = boxes[:, 3] - boxes[:, 1]
 
-    out[0, 0, :] = cx
-    out[0, 1, :] = cy
-    out[0, 2, :] = w
-    out[0, 3, :] = h
-
     keep = confs > 0.0
     valid_idx = np.where(keep)[0]
     valid_cids = cids[valid_idx]
     if (valid_cids < 0).any() or (valid_cids >= num_classes).any():
         raise ValueError("class id out of range for given num_classes")
+
+    # For padded rows (conf == 0), do not write box channels — leave them
+    # at the zero initialization. Only write box channels for kept rows.
+    out[0, 0, valid_idx] = cx[valid_idx]
+    out[0, 1, valid_idx] = cy[valid_idx]
+    out[0, 2, valid_idx] = w[valid_idx]
+    out[0, 3, valid_idx] = h[valid_idx]
     out[0, 4 + valid_cids, valid_idx] = confs[valid_idx]
-
-    # Zero out box channels for padded rows (conf == 0)
-    pad = ~keep
-    out[0, 0:4, pad] = 0
-    return out
+    return cast(np.ndarray, out)
 
 
-def v8_shape_to_e2e(output: np.ndarray) -> np.ndarray:
+def v8_shape_to_e2e(
+    output: np.ndarray,
+    *,
+    num_classes: int | None = None,
+) -> np.ndarray:
     arr = np.asarray(output)
-    if arr.ndim != 3 or arr.shape[0] != 1:
-        raise ValueError(f"expected (1, 4+nc, N) or (1, N, 4+nc); got {arr.shape}")
-
-    a, b = arr.shape[1], arr.shape[2]
-    # Heuristic: channel axis must be >=5 (4 box + >=1 class). When both dims
-    # qualify, prefer canonical (1, 4+nc, N) where N > channels; when only one
-    # qualifies (e.g. N=1 anchor), that dim is channels.
-    a_ok = a >= 5
-    b_ok = b >= 5
-    if a_ok and b_ok:
-        if a <= b:
-            canonical = arr  # (1, 4+nc, N)
-        else:
-            canonical = np.transpose(arr, (0, 2, 1))
-    elif a_ok and not b_ok:
-        canonical = arr
-    elif b_ok and not a_ok:
-        canonical = np.transpose(arr, (0, 2, 1))
-    else:
-        raise ValueError(
-            f"cannot infer channel axis from shape {arr.shape}; "
-            "expected (1, 4+nc, N) with 4+nc >= 5"
-        )
+    canonical, _ch = _split_channel_anchor_axes(arr, num_classes=num_classes)
 
     boxes_cxcywh = canonical[0, 0:4, :]
     cls = canonical[0, 4:, :]
