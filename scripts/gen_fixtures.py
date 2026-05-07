@@ -29,63 +29,27 @@ def _download(url: str, dst: Path) -> None:
         urllib.request.urlretrieve(url, dst)  # noqa: S310
 
 
-def _coco_classes() -> tuple[str, ...]:
-    sys.path.insert(0, str(ROOT / "python" / "src"))
-    from yolo26_kit.core.types import COCO_CLASSES
-    return COCO_CLASSES
-
-
 def _ultralytics_version() -> str:
     import ultralytics
     return ultralytics.__version__
 
 
 def _decode_v8_raw(out: np.ndarray, conf: float = 0.25) -> list[dict[str, Any]]:
-    """Decode (1, 4+nc, N) raw tensor to list of detections in 640 letterbox coords."""
-    classes = _coco_classes()
-    arr = out[0]  # (4+nc, N)
-    boxes_cxcywh = arr[0:4, :]
-    cls = arr[4:, :]
-    scores = cls.max(axis=0)
-    cls_ids = cls.argmax(axis=0).astype(np.int32)
-    cx, cy, w, h = boxes_cxcywh[0], boxes_cxcywh[1], boxes_cxcywh[2], boxes_cxcywh[3]
-    x1, y1, x2, y2 = cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2
-    mask = scores >= conf
-    sel = np.where(mask)[0]
-    # Sort by descending score, then class asc, then index asc.
-    order = np.lexsort((sel, cls_ids[sel], -scores[sel]))
-    rows = []
-    for j in order:
-        i = sel[j]
-        rows.append({
-            "box": [float(x1[i]), float(y1[i]), float(x2[i]), float(y2[i])],
-            "score": float(scores[i]),
-            "class": int(cls_ids[i]),
-            "label": classes[int(cls_ids[i])],
-        })
-    return rows
+    """Decode (1, 4+nc, N) raw tensor using the library's own decoder for parity."""
+    sys.path.insert(0, str(ROOT / "python" / "src"))
+    from yolo26_kit.core.decode_raw import decode_detect
+    result = decode_detect(out, conf=conf, num_classes=80)
+    assert isinstance(result, list)
+    return result
 
 
 def _decode_e2e(out: np.ndarray, conf: float = 0.25) -> list[dict[str, Any]]:
-    """Decode (1, K, 6) e2e tensor."""
-    classes = _coco_classes()
-    arr = out[0]
-    keep = arr[:, 4] >= conf
-    arr = arr[keep]
-    # Sort by descending score then class asc then index asc.
-    src = np.arange(arr.shape[0])
-    order = np.lexsort((src, arr[:, 5].astype(np.int32), -arr[:, 4]))
-    arr = arr[order]
-    rows = []
-    for r in arr:
-        cid = int(r[5])
-        rows.append({
-            "box": [float(r[0]), float(r[1]), float(r[2]), float(r[3])],
-            "score": float(r[4]),
-            "class": cid,
-            "label": classes[cid],
-        })
-    return rows
+    """Decode (1, K, 6) e2e tensor using the library's filter_e2e for parity."""
+    sys.path.insert(0, str(ROOT / "python" / "src"))
+    from yolo26_kit.core.filter_e2e import filter_e2e
+    result = filter_e2e(out, conf=conf)
+    assert isinstance(result, list)
+    return result
 
 
 def _generate(name: str, img_path: Path, mode: str) -> None:
